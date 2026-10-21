@@ -66,6 +66,11 @@ class MainActivity : AppCompatActivity() {
     private var recordingStartedAt = 0L
     private var lowPowerProfile = false
     private var request4K = true
+    private var focusLocked = false
+    private var longPressTriggered = false
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    private val focusHandler = Handler(Looper.getMainLooper())
     private val timerHandler = Handler(Looper.getMainLooper())
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val timerRunnable = object : Runnable {
@@ -102,7 +107,28 @@ class MainActivity : AppCompatActivity() {
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             scaleType = PreviewView.ScaleType.FILL_CENTER
             setBackgroundColor(Color.BLACK)
-            setOnTouchListener { _, event -> if (event.action == MotionEvent.ACTION_UP) focusAt(event.x, event.y); true }
+            setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        touchDownX = event.x
+                        touchDownY = event.y
+                        longPressTriggered = false
+                        focusHandler.postDelayed({
+                            longPressTriggered = true
+                            focusAt(touchDownX, touchDownY, lock = true)
+                        }, 550)
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        focusHandler.removeCallbacksAndMessages(null)
+                        if (!longPressTriggered) {
+                            focusLocked = false
+                            focusAt(event.x, event.y, lock = false)
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL -> focusHandler.removeCallbacksAndMessages(null)
+                }
+                true
+            }
         }
         viewfinder.addView(previewView, FrameLayout.LayoutParams(-1, -1))
         val grid = GridOverlay(this)
@@ -216,7 +242,14 @@ class MainActivity : AppCompatActivity() {
         if (state.isExposureCompensationSupported) exposureBar.progress = 50
     }
 
-    private fun focusAt(x: Float, y: Float) { val point = previewView.meteringPointFactory.createPoint(x, y); camera?.cameraControl?.startFocusAndMetering(FocusMeteringAction.Builder(point).setAutoCancelDuration(3, TimeUnit.SECONDS).build()) }
+    private fun focusAt(x: Float, y: Float, lock: Boolean) {
+        val point = previewView.meteringPointFactory.createPoint(x, y)
+        val actionBuilder = FocusMeteringAction.Builder(point)
+        if (lock) actionBuilder.disableAutoCancel() else actionBuilder.setAutoCancelDuration(3, TimeUnit.SECONDS)
+        camera?.cameraControl?.startFocusAndMetering(actionBuilder.build())
+        focusLocked = lock
+        if (!recordingNow) statusText.text = if (lock) "● AF LOCK" else "● READY"
+    }
 
     private fun takePhoto() {
         val capture = imageCapture ?: return; val values = ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, "NEXA_${timestamp()}.jpg"); put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg"); if (Build.VERSION.SDK_INT >= 29) put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/NEXA CAM") }
@@ -260,7 +293,7 @@ class MainActivity : AppCompatActivity() {
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     override fun onStop() { if (recordingNow) activeRecording?.stop(); super.onStop() }
-    override fun onDestroy() { timerHandler.removeCallbacksAndMessages(null); cameraExecutor.shutdown(); super.onDestroy() }
+    override fun onDestroy() { timerHandler.removeCallbacksAndMessages(null); focusHandler.removeCallbacksAndMessages(null); cameraExecutor.shutdown(); super.onDestroy() }
 
     private class GridOverlay(context: android.content.Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(115, 255, 255, 255); strokeWidth = 1f }

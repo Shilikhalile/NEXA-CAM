@@ -42,3 +42,7 @@ Video quality now defaults to `4K AUTO` on devices that are not detected as low-
 ## Exposure control
 
 The camera now exposes a real EV compensation slider. It maps to the active camera's supported compensation range and disables itself with `EV N/A` when the hardware does not support it. Stronger devices use CameraX maximum-quality still capture while low-RAM devices keep minimize-latency capture.
+
+## Focus lock
+
+Tap the viewfinder to refocus. Hold for 550 ms to lock focus and metering at that point; tap again to unlock and refocus. The status changes to `AF LOCK` while the lock is active.
