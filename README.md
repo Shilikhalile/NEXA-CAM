@@ -38,3 +38,7 @@ NEXA CAM now detects low-RAM devices and automatically uses a lighter profile: S
 ## 4K video
 
 Video quality now defaults to `4K AUTO` on devices that are not detected as low-RAM. CameraX requests UHD and automatically falls back to the nearest supported quality when the active camera cannot record 4K. The button can switch between `4K AUTO` and `HD AUTO`; low-RAM devices keep the lighter SD profile for stability.
+
+## Exposure control
+
+The camera now exposes a real EV compensation slider. It maps to the active camera's supported compensation range and disables itself with `EV N/A` when the hardware does not support it. Stronger devices use CameraX maximum-quality still capture while low-RAM devices keep minimize-latency capture.

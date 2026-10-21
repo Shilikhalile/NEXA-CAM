@@ -53,6 +53,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var shutterButton: Button
     private lateinit var flashButton: Button
     private lateinit var qualityButton: Button
+    private lateinit var exposureText: TextView
+    private lateinit var exposureBar: SeekBar
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -138,6 +140,29 @@ class MainActivity : AppCompatActivity() {
         val gridButton = makeButton("GRID ON").apply { setOnClickListener { grid.visibility = if (grid.visibility == View.VISIBLE) View.GONE else View.VISIBLE; text = if (grid.visibility == View.VISIBLE) "GRID ON" else "GRID OFF" } }
         zoomRow.addView(gridButton, LinearLayout.LayoutParams(dp(92), dp(36))); root.addView(zoomRow)
 
+        val exposureRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        exposureText = TextView(this).apply { text = "EV 0.0"; setTextColor(Color.LTGRAY); textSize = 11f }
+        exposureRow.addView(exposureText, LinearLayout.LayoutParams(dp(58), dp(32)))
+        exposureBar = SeekBar(this).apply {
+            max = 100
+            progress = 50
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                    val state = camera?.cameraInfo?.exposureState ?: return
+                    if (!state.isExposureCompensationSupported) return
+                    val range = state.exposureCompensationRange
+                    val index = range.lower + ((range.upper - range.lower) * progress / 100f).toInt()
+                    camera?.cameraControl?.setExposureCompensationIndex(index)
+                    exposureText.text = "EV ${String.format(Locale.US, "%.1f", index * state.exposureCompensationStep.toDouble())}"
+                }
+                override fun onStartTrackingTouch(bar: SeekBar) = Unit
+                override fun onStopTrackingTouch(bar: SeekBar) = Unit
+            })
+        }
+        exposureRow.addView(exposureBar, LinearLayout.LayoutParams(0, dp(32), 1f))
+        exposureRow.addView(TextView(this).apply { text = "EXPOSURE"; textSize = 9f; setTextColor(Color.GRAY) }, LinearLayout.LayoutParams(dp(68), dp(32)))
+        root.addView(exposureRow)
+
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER }
         flashButton = makeButton("FLASH OFF").apply { setOnClickListener { flashEnabled = !flashEnabled; applyFlash(); updateUI() } }
         shutterButton = makeButton("●").apply { textSize = 27f; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(190, 25, 35)); setOnClickListener { if (videoMode) toggleRecording() else takePhoto() } }
@@ -159,7 +184,7 @@ class MainActivity : AppCompatActivity() {
             if (!provider.hasCamera(selector)) { showError("This camera is not available."); return@addListener }
             val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
             imageCapture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setCaptureMode(if (lowPowerProfile) ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY else ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                 .setJpegQuality(if (lowPowerProfile) 82 else 95)
                 .setFlashMode(if (flashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF)
                 .build()
@@ -173,7 +198,7 @@ class MainActivity : AppCompatActivity() {
                 camera = if (videoMode) provider.bindToLifecycle(this, selector, preview, videoCapture) else provider.bindToLifecycle(this, selector, preview, imageCapture)
                 if (camera?.cameraInfo?.hasFlashUnit() != true) flashEnabled = false
                 flashButton.isEnabled = camera?.cameraInfo?.hasFlashUnit() == true
-                applyFlash(); updateUI()
+                applyFlash(); configureExposure(); updateUI()
             } catch (e: Exception) { showError("Camera error: ${e.localizedMessage}") }
         }, ContextCompat.getMainExecutor(this))
     }
@@ -184,6 +209,13 @@ class MainActivity : AppCompatActivity() {
         imageCapture?.flashMode = if (flashEnabled && available) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
         camera?.cameraControl?.enableTorch(flashEnabled && available && videoMode)
     }
+    private fun configureExposure() {
+        val state = camera?.cameraInfo?.exposureState ?: return
+        exposureBar.isEnabled = state.isExposureCompensationSupported
+        exposureText.text = if (state.isExposureCompensationSupported) "EV 0.0" else "EV N/A"
+        if (state.isExposureCompensationSupported) exposureBar.progress = 50
+    }
+
     private fun focusAt(x: Float, y: Float) { val point = previewView.meteringPointFactory.createPoint(x, y); camera?.cameraControl?.startFocusAndMetering(FocusMeteringAction.Builder(point).setAutoCancelDuration(3, TimeUnit.SECONDS).build()) }
 
     private fun takePhoto() {
