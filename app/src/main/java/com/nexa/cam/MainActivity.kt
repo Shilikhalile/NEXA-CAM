@@ -33,6 +33,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
+import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
@@ -51,6 +52,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeButton: Button
     private lateinit var shutterButton: Button
     private lateinit var flashButton: Button
+    private lateinit var qualityButton: Button
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -61,6 +63,7 @@ class MainActivity : AppCompatActivity() {
     private var recordingNow = false
     private var recordingStartedAt = 0L
     private var lowPowerProfile = false
+    private var request4K = true
     private val timerHandler = Handler(Looper.getMainLooper())
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val timerRunnable = object : Runnable {
@@ -106,7 +109,15 @@ class MainActivity : AppCompatActivity() {
 
         modeButton = makeButton("MODE: PHOTO")
         modeButton.setOnClickListener { if (!recordingNow) { videoMode = !videoMode; updateUI(); startCamera() } else showError("Stop recording before switching mode.") }
-        root.addView(modeButton, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(5) })
+        qualityButton = makeButton("4K AUTO")
+        qualityButton.setOnClickListener {
+            if (!recordingNow) { request4K = !request4K; updateUI(); if (videoMode) startCamera() }
+            else showError("Stop recording before changing quality.")
+        }
+        val modeRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        modeRow.addView(modeButton, LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = dp(5) })
+        modeRow.addView(qualityButton, LinearLayout.LayoutParams(dp(96), dp(44)))
+        root.addView(modeRow, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(5) })
 
         val zoomRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val zoomText = TextView(this).apply { text = "ZOOM 1.0x"; setTextColor(Color.LTGRAY); textSize = 11f }
@@ -152,7 +163,10 @@ class MainActivity : AppCompatActivity() {
                 .setJpegQuality(if (lowPowerProfile) 82 else 95)
                 .setFlashMode(if (flashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF)
                 .build()
-            val recorder = Recorder.Builder().setQualitySelector(QualitySelector.from(preferredVideoQuality())).build()
+            val fallback = if (request4K && !lowPowerProfile) Quality.FHD else Quality.HD
+            val recorder = Recorder.Builder().setQualitySelector(
+                QualitySelector.from(preferredVideoQuality(), FallbackStrategy.lowerQualityOrHigherThan(fallback))
+            ).build()
             videoCapture = VideoCapture.withOutput(recorder)
             try {
                 provider.unbindAll()
@@ -199,9 +213,17 @@ class MainActivity : AppCompatActivity() {
         val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
         return manager.isLowRamDevice || manager.memoryClass < 256
     }
-    private fun preferredVideoQuality(): Quality = if (lowPowerProfile) Quality.SD else Quality.HD
-    private fun qualityLabel(): String = if (lowPowerProfile) "LOW POWER 480p" else "HD 720p"
-    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = if (videoMode) "MODE: VIDEO  •  TAP TO SWITCH" else "MODE: PHOTO  •  TAP TO SWITCH"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (!recordingNow) statusText.text = "● READY" }
+    private fun preferredVideoQuality(): Quality = when {
+        lowPowerProfile -> Quality.SD
+        request4K -> Quality.UHD
+        else -> Quality.HD
+    }
+    private fun qualityLabel(): String = when {
+        lowPowerProfile -> "LOW POWER 480p"
+        request4K -> "4K AUTO"
+        else -> "HD 720p"
+    }
+    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = if (videoMode) "MODE: VIDEO  •  TAP TO SWITCH" else "MODE: PHOTO  •  TAP TO SWITCH"; qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (!recordingNow) statusText.text = "● READY" }
     private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()

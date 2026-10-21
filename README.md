@@ -34,3 +34,7 @@ Android Studio with Android SDK 35, JDK 17, and a device/emulator with a camera.
 ## Adaptive camera profile
 
 NEXA CAM now detects low-RAM devices and automatically uses a lighter profile: SD video quality and lower JPEG processing cost to reduce lag, heat, and memory pressure. Devices with more memory use HD video and higher JPEG quality. Flash controls are disabled when the active camera has no flash unit.
+
+## 4K video
+
+Video quality now defaults to `4K AUTO` on devices that are not detected as low-RAM. CameraX requests UHD and automatically falls back to the nearest supported quality when the active camera cannot record 4K. The button can switch between `4K AUTO` and `HD AUTO`; low-RAM devices keep the lighter SD profile for stability.
