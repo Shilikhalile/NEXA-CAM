@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private var recordingStartedAt = 0L
     private var lowPowerProfile = false
     private var request4K = true
+    private var eisEnabled = false
     private var focusLocked = false
     private var longPressTriggered = false
     private var touchDownX = 0f
@@ -218,14 +219,31 @@ class MainActivity : AppCompatActivity() {
             val recorder = Recorder.Builder().setQualitySelector(
                 QualitySelector.from(preferredVideoQuality(), FallbackStrategy.lowerQualityOrHigherThan(fallback))
             ).build()
-            videoCapture = VideoCapture.withOutput(recorder)
+            videoCapture = VideoCapture.Builder(recorder)
+                .setVideoStabilizationEnabled(true)
+                .build()
             try {
                 provider.unbindAll()
                 camera = if (videoMode) provider.bindToLifecycle(this, selector, preview, videoCapture) else provider.bindToLifecycle(this, selector, preview, imageCapture)
+                eisEnabled = videoMode
                 if (camera?.cameraInfo?.hasFlashUnit() != true) flashEnabled = false
                 flashButton.isEnabled = camera?.cameraInfo?.hasFlashUnit() == true
                 applyFlash(); configureExposure(); updateUI()
-            } catch (e: Exception) { showError("Camera error: ${e.localizedMessage}") }
+            } catch (e: Exception) {
+                if (videoMode) {
+                    try {
+                        provider.unbindAll()
+                        videoCapture = VideoCapture.withOutput(recorder)
+                        camera = provider.bindToLifecycle(this, selector, preview, videoCapture)
+                        eisEnabled = false
+                        applyFlash(); configureExposure(); updateUI()
+                    } catch (fallbackError: Exception) {
+                        showError("Camera error: ${fallbackError.localizedMessage}")
+                    }
+                } else {
+                    showError("Camera error: ${e.localizedMessage}")
+                }
+            }
         }, ContextCompat.getMainExecutor(this))
     }
 
@@ -288,7 +306,7 @@ class MainActivity : AppCompatActivity() {
         request4K -> "4K AUTO"
         else -> "HD 720p"
     }
-    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = if (videoMode) "MODE: VIDEO  •  TAP TO SWITCH" else "MODE: PHOTO  •  TAP TO SWITCH"; qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (!recordingNow) statusText.text = "● READY" }
+    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = if (videoMode) "MODE: VIDEO  •  TAP TO SWITCH" else "MODE: PHOTO  •  TAP TO SWITCH"; qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
     private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()

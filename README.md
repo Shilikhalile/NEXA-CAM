@@ -46,3 +46,7 @@ The camera now exposes a real EV compensation slider. It maps to the active came
 ## Focus lock
 
 Tap the viewfinder to refocus. Hold for 550 ms to lock focus and metering at that point; tap again to unlock and refocus. The status changes to `AF LOCK` while the lock is active.
+
+## Electronic image stabilization
+
+Video mode now requests CameraX electronic video stabilization. When the device/camera combination rejects stabilization, NEXA CAM automatically rebinds without EIS instead of crashing and does not display `EIS ON`.
