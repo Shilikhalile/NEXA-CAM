@@ -133,7 +133,7 @@ class MainActivity : AppCompatActivity() {
         val flipButton = makeButton("FLIP").apply { setOnClickListener { if (!recordingNow) { lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK; startCamera() } } }
         actions.addView(flashButton, LinearLayout.LayoutParams(0, dp(54), 1f).apply { rightMargin = dp(6) }); actions.addView(shutterButton, LinearLayout.LayoutParams(0, dp(62), 1.25f).apply { leftMargin = dp(4); rightMargin = dp(4) }); actions.addView(flipButton, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(6) }); root.addView(actions)
         root.addView(TextView(this).apply {
-            text = if (lowPowerProfile) "AUTO PERFORMANCE  •  TAP TO FOCUS  •  ${qualityLabel()}" else "AUTO HDR READY  •  TAP TO FOCUS  •  ${qualityLabel()}"
+            text = if (lowPowerProfile) "AUTO PERFORMANCE  •  TAP TO FOCUS  •  ${qualityLabel()}" else "AUTO QUALITY READY  •  TAP TO FOCUS  •  ${qualityLabel()}"
             textSize = 9f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(Color.LTGRAY); setPadding(0, dp(8), 0, dp(2))
         })
         setContentView(root); updateUI()
