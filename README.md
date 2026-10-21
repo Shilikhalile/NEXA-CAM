@@ -30,3 +30,7 @@ Android Studio with Android SDK 35, JDK 17, and a device/emulator with a camera.
 ## Package
 
 `com.nexa.cam`
+
+## Adaptive camera profile
+
+NEXA CAM now detects low-RAM devices and automatically uses a lighter profile: SD video quality and lower JPEG processing cost to reduce lag, heat, and memory pressure. Devices with more memory use HD video and higher JPEG quality. Flash controls are disabled when the active camera has no flash unit.

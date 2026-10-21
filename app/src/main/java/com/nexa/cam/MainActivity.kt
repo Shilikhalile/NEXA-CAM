@@ -1,6 +1,7 @@
 package com.nexa.cam
 
 import android.Manifest
+import android.app.ActivityManager
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Canvas
@@ -59,6 +60,7 @@ class MainActivity : AppCompatActivity() {
     private var flashEnabled = false
     private var recordingNow = false
     private var recordingStartedAt = 0L
+    private var lowPowerProfile = false
     private val timerHandler = Handler(Looper.getMainLooper())
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val timerRunnable = object : Runnable {
@@ -78,6 +80,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.rgb(8, 8, 8)
         window.navigationBarColor = Color.rgb(8, 8, 8)
+        lowPowerProfile = detectLowPowerDevice()
         buildUI()
         if (hasPermissions()) startCamera() else permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
     }
@@ -129,7 +132,10 @@ class MainActivity : AppCompatActivity() {
         shutterButton = makeButton("●").apply { textSize = 27f; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(190, 25, 35)); setOnClickListener { if (videoMode) toggleRecording() else takePhoto() } }
         val flipButton = makeButton("FLIP").apply { setOnClickListener { if (!recordingNow) { lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK; startCamera() } } }
         actions.addView(flashButton, LinearLayout.LayoutParams(0, dp(54), 1f).apply { rightMargin = dp(6) }); actions.addView(shutterButton, LinearLayout.LayoutParams(0, dp(62), 1.25f).apply { leftMargin = dp(4); rightMargin = dp(4) }); actions.addView(flipButton, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(6) }); root.addView(actions)
-        root.addView(TextView(this).apply { text = "TAP VIEWFINDER TO FOCUS  •  PRO PHOTO  •  CINEMA VIDEO"; textSize = 9f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(Color.LTGRAY); setPadding(0, dp(8), 0, dp(2)) })
+        root.addView(TextView(this).apply {
+            text = if (lowPowerProfile) "AUTO PERFORMANCE  •  TAP TO FOCUS  •  ${qualityLabel()}" else "AUTO HDR READY  •  TAP TO FOCUS  •  ${qualityLabel()}"
+            textSize = 9f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(Color.LTGRAY); setPadding(0, dp(8), 0, dp(2))
+        })
         setContentView(root); updateUI()
     }
 
@@ -141,13 +147,29 @@ class MainActivity : AppCompatActivity() {
             val provider = future.get(); val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             if (!provider.hasCamera(selector)) { showError("This camera is not available."); return@addListener }
             val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
-            imageCapture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).setFlashMode(if (flashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF).build()
-            val recorder = Recorder.Builder().setQualitySelector(QualitySelector.from(Quality.HD)).build(); videoCapture = VideoCapture.withOutput(recorder)
-            try { provider.unbindAll(); camera = if (videoMode) provider.bindToLifecycle(this, selector, preview, videoCapture) else provider.bindToLifecycle(this, selector, preview, imageCapture); applyFlash() } catch (e: Exception) { showError("Camera error: ${e.localizedMessage}") }
+            imageCapture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setJpegQuality(if (lowPowerProfile) 82 else 95)
+                .setFlashMode(if (flashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF)
+                .build()
+            val recorder = Recorder.Builder().setQualitySelector(QualitySelector.from(preferredVideoQuality())).build()
+            videoCapture = VideoCapture.withOutput(recorder)
+            try {
+                provider.unbindAll()
+                camera = if (videoMode) provider.bindToLifecycle(this, selector, preview, videoCapture) else provider.bindToLifecycle(this, selector, preview, imageCapture)
+                if (camera?.cameraInfo?.hasFlashUnit() != true) flashEnabled = false
+                flashButton.isEnabled = camera?.cameraInfo?.hasFlashUnit() == true
+                applyFlash(); updateUI()
+            } catch (e: Exception) { showError("Camera error: ${e.localizedMessage}") }
         }, ContextCompat.getMainExecutor(this))
     }
 
-    private fun applyFlash() { imageCapture?.flashMode = if (flashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF; camera?.cameraControl?.enableTorch(flashEnabled && videoMode) }
+    private fun applyFlash() {
+        val available = camera?.cameraInfo?.hasFlashUnit() == true
+        if (!available) flashEnabled = false
+        imageCapture?.flashMode = if (flashEnabled && available) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
+        camera?.cameraControl?.enableTorch(flashEnabled && available && videoMode)
+    }
     private fun focusAt(x: Float, y: Float) { val point = previewView.meteringPointFactory.createPoint(x, y); camera?.cameraControl?.startFocusAndMetering(FocusMeteringAction.Builder(point).setAutoCancelDuration(3, TimeUnit.SECONDS).build()) }
 
     private fun takePhoto() {
@@ -173,6 +195,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hasPermissions() = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    private fun detectLowPowerDevice(): Boolean {
+        val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        return manager.isLowRamDevice || manager.memoryClass < 256
+    }
+    private fun preferredVideoQuality(): Quality = if (lowPowerProfile) Quality.SD else Quality.HD
+    private fun qualityLabel(): String = if (lowPowerProfile) "LOW POWER 480p" else "HD 720p"
     private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = if (videoMode) "MODE: VIDEO  •  TAP TO SWITCH" else "MODE: PHOTO  •  TAP TO SWITCH"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (!recordingNow) statusText.text = "● READY" }
     private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
