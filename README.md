@@ -74,3 +74,7 @@ Photo Pro now includes Camera2 manual white-balance presets: Auto, Daylight, Clo
 ## Smart computational photo modes
 
 The mode picker now includes Photo Smart HDR and Photo Night. These modes use CameraX Extensions to request the phone manufacturer's HDR or Night processing when supported by the camera. Unsupported devices fall back to Photo Auto without crashing. Photo Pro remains available for manual shutter, ISO, and white balance control.
+
+## Portrait photo mode
+
+Photo Portrait uses the CameraX Bokeh extension when the device exposes a supported portrait/depth implementation. Unsupported cameras fall back to Photo Auto without crashing.
