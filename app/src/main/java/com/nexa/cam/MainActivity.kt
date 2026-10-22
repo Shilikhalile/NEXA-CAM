@@ -219,6 +219,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var shutterButton: Button
     private lateinit var flashButton: Button
     private lateinit var qualityButton: Button
+    private lateinit var stabilizationButton: Button
     private lateinit var exposureText: TextView
     private lateinit var exposureBar: SeekBar
     private lateinit var filterButton: Button
@@ -246,6 +247,7 @@ class MainActivity : AppCompatActivity() {
     private var lowPowerProfile = false
     private var request4K = true
     private var eisEnabled = false
+    private var stabilizationLevel = 1 // 0 off, 1 standard EIS, 2 strong EIS + OIS request
     private var currentFilter = 0
     private var savedFilterEffect: OverlayEffect? = null
     private val shutterSpeedsNs = longArrayOf(33333333L, 16666666L, 8333333L, 4166666L, 2000000L, 1000000L)
@@ -351,6 +353,16 @@ class MainActivity : AppCompatActivity() {
         modeRow.addView(modeButton, LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = dp(5) })
         modeRow.addView(qualityButton, LinearLayout.LayoutParams(dp(96), dp(44)))
         root.addView(modeRow, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(5) })
+
+        stabilizationButton = makeButton("STAB STANDARD").apply {
+            setOnClickListener {
+                if (recordingNow) { showError("Stop recording before changing stabilization."); return@setOnClickListener }
+                stabilizationLevel = (stabilizationLevel + 1) % 3
+                updateUI()
+                if (videoMode) startCamera()
+            }
+        }
+        root.addView(stabilizationButton, LinearLayout.LayoutParams(-1, dp(36)).apply { bottomMargin = dp(5) })
 
         val zoomRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val zoomText = TextView(this).apply { text = "ZOOM 1.0x"; setTextColor(Color.LTGRAY); textSize = 11f }
@@ -579,9 +591,14 @@ class MainActivity : AppCompatActivity() {
             val recorder = Recorder.Builder().setQualitySelector(
                 QualitySelector.from(preferredVideoQuality(), FallbackStrategy.lowerQualityOrHigherThan(fallback))
             ).build()
-            videoCapture = VideoCapture.Builder(recorder)
-                .setVideoStabilizationEnabled(true)
-                .build()
+            val videoBuilder = VideoCapture.Builder(recorder)
+                .setVideoStabilizationEnabled(stabilizationLevel > 0)
+            if (stabilizationLevel == 2) {
+                val camera2 = Camera2Interop.Extender(videoBuilder)
+                camera2.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)
+                camera2.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON)
+            }
+            videoCapture = videoBuilder.build()
             try {
                 provider.unbindAll()
                 val effectTargets = CameraEffect.PREVIEW or if (videoMode) CameraEffect.VIDEO_CAPTURE else CameraEffect.IMAGE_CAPTURE
@@ -597,7 +614,7 @@ class MainActivity : AppCompatActivity() {
                 if (videoMode) groupBuilder.addUseCase(videoCapture!!) else groupBuilder.addUseCase(imageCapture!!)
                 camera = provider.bindToLifecycle(this, selector, groupBuilder.build())
                 filterOverlay.visibility = View.GONE
-                eisEnabled = videoMode
+                eisEnabled = videoMode && stabilizationLevel > 0
                 extensionControl = null
                 applyExtensionStrength()
                 if (camera?.cameraInfo?.hasFlashUnit() != true) flashEnabled = false
@@ -608,12 +625,15 @@ class MainActivity : AppCompatActivity() {
                 try {
                     provider.unbindAll()
                     if (videoMode) {
-                        videoCapture = VideoCapture.withOutput(recorder)
+                        if (stabilizationLevel == 2) stabilizationLevel = 1
+                        videoCapture = VideoCapture.Builder(recorder)
+                            .setVideoStabilizationEnabled(stabilizationLevel > 0)
+                            .build()
                         camera = provider.bindToLifecycle(this, selector, preview, videoCapture)
                     } else {
                         camera = provider.bindToLifecycle(this, selector, preview, imageCapture)
                     }
-                    eisEnabled = videoMode
+                    eisEnabled = videoMode && stabilizationLevel > 0
                     applyFlash(); configureExposure(); updateUI()
                     showError("Saved filter unavailable on this camera; original media is being saved.")
                 } catch (fallbackError: Exception) {
@@ -760,7 +780,7 @@ class MainActivity : AppCompatActivity() {
         request4K -> "MODE: VIDEO 4K"
         else -> "MODE: VIDEO HD"
     }
-    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (::proControls.isInitialized) proControls.visibility = if (manualExposureEnabled()) View.VISIBLE else View.GONE; if (::portraitControls.isInitialized) portraitControls.visibility = if (!videoMode && photoEnhancementMode in 1..4) View.VISIBLE else View.GONE; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
+    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; stabilizationButton.text = when (stabilizationLevel) { 0 -> "STAB OFF"; 2 -> "STAB STRONG • EIS + OIS"; else -> "STAB STANDARD • EIS" }; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (::proControls.isInitialized) proControls.visibility = if (manualExposureEnabled()) View.VISIBLE else View.GONE; if (::portraitControls.isInitialized) portraitControls.visibility = if (!videoMode && photoEnhancementMode in 1..4) View.VISIBLE else View.GONE; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  ${if (stabilizationLevel == 2) "STRONG STAB" else "EIS ON"}" else "● READY" }
     private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()

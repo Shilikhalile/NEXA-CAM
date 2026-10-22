@@ -110,3 +110,7 @@ Film Stock adds a scanned-film look with lifted blacks, warm highlights, cooler 
 ## Dark night filters
 
 Cyberpunk Night and Neon Night are optimized for dark scenes: they deepen navy shadows, emphasize cyan and magenta light sources, add colored bloom/glow, and apply a controlled vignette. Cyberpunk Night also adds subtle scan lines; Neon Night keeps a cleaner neon-cinema look. Both effects are rendered in preview and composited into saved photos and videos.
+
+## Video stabilization controls
+
+Video mode now offers three levels: Stabilization Off, Standard EIS, and Strong EIS + OIS request. Standard uses CameraX video stabilization. Strong additionally requests Camera2 video stabilization and optical stabilization where supported. If the device rejects the strong configuration, the app automatically falls back to Standard EIS.
