@@ -8,6 +8,8 @@ import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.LinearGradient
+import android.graphics.Shader
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -56,6 +58,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var qualityButton: Button
     private lateinit var exposureText: TextView
     private lateinit var exposureBar: SeekBar
+    private lateinit var filterButton: Button
+    private lateinit var filterOverlay: FilterOverlay
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -70,6 +74,7 @@ class MainActivity : AppCompatActivity() {
     private var lowPowerProfile = false
     private var request4K = true
     private var eisEnabled = false
+    private var currentFilter = 0
     private var focusLocked = false
     private var longPressTriggered = false
     private var touchDownX = 0f
@@ -135,6 +140,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
         viewfinder.addView(previewView, FrameLayout.LayoutParams(-1, -1))
+        filterOverlay = FilterOverlay(this)
+        filterOverlay.isClickable = false
+        viewfinder.addView(filterOverlay, FrameLayout.LayoutParams(-1, -1))
         val grid = GridOverlay(this)
         viewfinder.addView(grid, FrameLayout.LayoutParams(-1, -1))
         root.addView(viewfinder, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(8); bottomMargin = dp(8) })
@@ -168,7 +176,10 @@ class MainActivity : AppCompatActivity() {
             })
         }, LinearLayout.LayoutParams(0, dp(36), 1f))
         val gridButton = makeButton("GRID ON").apply { setOnClickListener { grid.visibility = if (grid.visibility == View.VISIBLE) View.GONE else View.VISIBLE; text = if (grid.visibility == View.VISIBLE) "GRID ON" else "GRID OFF" } }
-        zoomRow.addView(gridButton, LinearLayout.LayoutParams(dp(92), dp(36))); root.addView(zoomRow)
+        filterButton = makeButton("FILTER").apply { setOnClickListener { showFilterPicker() } }
+        zoomRow.addView(gridButton, LinearLayout.LayoutParams(dp(72), dp(36)))
+        zoomRow.addView(filterButton, LinearLayout.LayoutParams(dp(72), dp(36)))
+        root.addView(zoomRow)
 
         val exposureRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         exposureText = TextView(this).apply { text = "EV 0.0"; setTextColor(Color.LTGRAY); textSize = 11f }
@@ -232,6 +243,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isLowPowerActive() = lowPowerProfile || forceLowPower
+
+    private fun showFilterPicker() {
+        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint")
+        AlertDialog.Builder(this)
+            .setTitle("LIVE FILTER")
+            .setSingleChoiceItems(filters, currentFilter) { dialog, which ->
+                currentFilter = which
+                filterOverlay.setFilter(which)
+                filterButton.text = if (which == 0) "FILTER" else filters[which].uppercase(Locale.US)
+                dialog.dismiss()
+            }
+            .setNegativeButton("CANCEL", null)
+            .show()
+    }
 
     private fun startCamera() {
         val future = ProcessCameraProvider.getInstance(this)
@@ -352,5 +377,31 @@ class MainActivity : AppCompatActivity() {
     private class GridOverlay(context: android.content.Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(115, 255, 255, 255); strokeWidth = 1f }
         override fun onDraw(canvas: Canvas) { val w = width.toFloat(); val h = height.toFloat(); canvas.drawLine(w / 3, 0f, w / 3, h, paint); canvas.drawLine(w * 2 / 3, 0f, w * 2 / 3, h, paint); canvas.drawLine(0f, h / 3, w, h / 3, paint); canvas.drawLine(0f, h * 2 / 3, w, h * 2 / 3, paint) }
+    }
+
+    private class FilterOverlay(context: android.content.Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private var filter = 0
+        fun setFilter(value: Int) { filter = value; invalidate() }
+        override fun onDraw(canvas: Canvas) {
+            when (filter) {
+                1 -> canvas.drawColor(Color.argb(42, 255, 145, 45))
+                2 -> canvas.drawColor(Color.argb(38, 35, 125, 255))
+                3 -> {
+                    canvas.drawColor(Color.argb(28, 12, 0, 0))
+                    paint.shader = LinearGradient(0f, 0f, width.toFloat(), height.toFloat(), Color.argb(55, 120, 20, 20), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+                    paint.shader = null
+                }
+                4 -> canvas.drawColor(Color.argb(48, 190, 20, 35))
+                5 -> canvas.drawColor(Color.argb(32, 220, 205, 170))
+                6 -> {
+                    canvas.drawColor(Color.argb(58, 20, 20, 20))
+                    paint.shader = LinearGradient(0f, 0f, 0f, height.toFloat(), Color.TRANSPARENT, Color.argb(85, 0, 0, 0), Shader.TileMode.CLAMP)
+                    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+                    paint.shader = null
+                }
+            }
+        }
     }
 }
