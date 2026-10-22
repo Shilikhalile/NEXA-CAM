@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
@@ -60,6 +61,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var exposureBar: SeekBar
     private lateinit var filterButton: Button
     private lateinit var filterOverlay: FilterOverlay
+    private lateinit var galleryButton: Button
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -204,6 +206,10 @@ class MainActivity : AppCompatActivity() {
         exposureRow.addView(TextView(this).apply { text = "EXPOSURE"; textSize = 9f; setTextColor(Color.GRAY) }, LinearLayout.LayoutParams(dp(68), dp(32)))
         root.addView(exposureRow)
 
+        galleryButton = makeButton("OPEN GALLERY")
+        galleryButton.setOnClickListener { openGallery() }
+        root.addView(galleryButton, LinearLayout.LayoutParams(-1, dp(38)).apply { topMargin = dp(3); bottomMargin = dp(5) })
+
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER }
         flashButton = makeButton("FLASH OFF").apply { setOnClickListener { flashEnabled = !flashEnabled; applyFlash(); updateUI() } }
         shutterButton = makeButton("●").apply { textSize = 27f; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(190, 25, 35)); setOnClickListener { if (videoMode) toggleRecording() else takePhoto() } }
@@ -321,6 +327,24 @@ class MainActivity : AppCompatActivity() {
         camera?.cameraControl?.startFocusAndMetering(actionBuilder.build())
         focusLocked = lock
         if (!recordingNow) statusText.text = if (lock) "● AF LOCK" else "● READY"
+    }
+
+    private fun openGallery() {
+        val mediaUri = MediaStore.Files.getContentUri("external")
+        val galleryIntent = Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(mediaUri, "*/*")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(galleryIntent)
+        } catch (_: Exception) {
+            val fallback = Intent(android.content.Intent.ACTION_GET_CONTENT).apply {
+                type = "*/*"
+                putExtra(android.content.Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+                addCategory(android.content.Intent.CATEGORY_OPENABLE)
+            }
+            startActivity(Intent.createChooser(fallback, "Choose media"))
+        }
     }
 
     private fun takePhoto() {

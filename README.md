@@ -58,3 +58,7 @@ The mode picker now provides five functional modes: Photo Auto, Photo Pro, Video
 ## Live filters and color effects
 
 The viewfinder now has a lightweight live overlay picker: Original, Warm, Cool, Cinema, Nexa Red, Fade, and Noir Tint. The effect updates immediately without adding heavy frame-by-frame processing, so low-end phones remain responsive. In this phase the saved photo/video stays the original camera capture; baked-in export filters are intentionally reserved for a later processing phase.
+
+## Gallery access
+
+An `OPEN GALLERY` button now opens the device media gallery for both images and videos. If the device has no gallery handler, the app falls back to the Android media picker. Captures continue to save into `Pictures/NEXA CAM` and `Movies/NEXA CAM` through MediaStore.
