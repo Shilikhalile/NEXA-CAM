@@ -86,3 +86,7 @@ Photo Portrait now shows a `BLUR` slider from 0% to 100%. It uses CameraX `Camer
 ## Manual focus
 
 Photo Pro now includes a focus-distance slider from infinity to the lens minimum focus distance. Camera2Interop applies `CONTROL_AF_MODE_OFF` and `LENS_FOCUS_DISTANCE` when the selected camera reports manual-focus support; fixed-focus cameras keep normal autofocus behavior.
+
+## Face Retouch mode
+
+Photo Face Retouch uses the CameraX `FACE_RETOUCH` extension when supported by the OEM camera. Its 0-100% strength control adjusts the amount of cosmetic enhancement and skin smoothing. Unsupported devices fall back safely.
