@@ -73,6 +73,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var proControls: LinearLayout
     private lateinit var shutterValueText: TextView
     private lateinit var isoValueText: TextView
+    private lateinit var whiteBalanceButton: Button
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -94,6 +95,16 @@ class MainActivity : AppCompatActivity() {
     private val isoValues = intArrayOf(100, 200, 400, 800, 1600, 3200)
     private var shutterIndex = 1
     private var isoIndex = 1
+    private val whiteBalanceModes = intArrayOf(
+        CaptureRequest.CONTROL_AWB_MODE_AUTO,
+        CaptureRequest.CONTROL_AWB_MODE_DAYLIGHT,
+        CaptureRequest.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT,
+        CaptureRequest.CONTROL_AWB_MODE_FLUORESCENT,
+        CaptureRequest.CONTROL_AWB_MODE_INCANDESCENT,
+        CaptureRequest.CONTROL_AWB_MODE_SHADE
+    )
+    private val whiteBalanceLabels = arrayOf("WB AUTO", "DAYLIGHT", "CLOUDY", "FLUORESCENT", "TUNGSTEN", "SHADE")
+    private var whiteBalanceIndex = 0
     private var focusLocked = false
     private var longPressTriggered = false
     private var touchDownX = 0f
@@ -253,6 +264,9 @@ class MainActivity : AppCompatActivity() {
         isoRow.addView(isoBar, LinearLayout.LayoutParams(0, dp(32), 1f))
         isoRow.addView(TextView(this).apply { text = "ISO"; textSize = 9f; setTextColor(Color.GRAY) }, LinearLayout.LayoutParams(dp(68), dp(32)))
         proControls.addView(isoRow)
+        whiteBalanceButton = makeButton("WB AUTO")
+        whiteBalanceButton.setOnClickListener { showWhiteBalancePicker() }
+        proControls.addView(whiteBalanceButton, LinearLayout.LayoutParams(-1, dp(36)).apply { topMargin = dp(2); bottomMargin = dp(3) })
         root.addView(proControls)
 
         galleryButton = makeButton("OPEN GALLERY")
@@ -298,6 +312,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isLowPowerActive() = lowPowerProfile || forceLowPower
+
+    private fun showWhiteBalancePicker() {
+        AlertDialog.Builder(this)
+            .setTitle("WHITE BALANCE")
+            .setSingleChoiceItems(whiteBalanceLabels, whiteBalanceIndex) { dialog, which ->
+                whiteBalanceIndex = which
+                whiteBalanceButton.text = whiteBalanceLabels[which]
+                dialog.dismiss()
+                if (manualExposureEnabled() && !recordingNow) startCamera()
+            }
+            .setNegativeButton("CANCEL", null)
+            .show()
+    }
 
     private fun showFilterPicker() {
         val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint")
@@ -411,6 +438,7 @@ class MainActivity : AppCompatActivity() {
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
         extender.setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, shutterSpeedsNs[shutterIndex])
         extender.setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, isoValues[isoIndex])
+        extender.setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, whiteBalanceModes[whiteBalanceIndex])
     }
 
     private fun configureExposure() {

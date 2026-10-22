@@ -66,3 +66,7 @@ An `OPEN GALLERY` button now opens the device media gallery for both images and 
 ## Photo Pro manual exposure
 
 Photo Pro now exposes manual shutter speed and ISO controls. Shutter choices range from 1/30 to 1/1000 and ISO from 100 to 3200. Camera2Interop sends `CONTROL_AE_MODE_OFF`, `SENSOR_EXPOSURE_TIME`, and `SENSOR_SENSITIVITY` to the CameraX capture pipeline, while Auto mode keeps normal AE/EV behavior. Devices that reject manual requests safely fall back to the regular camera path.
+
+## Manual white balance
+
+Photo Pro now includes Camera2 manual white-balance presets: Auto, Daylight, Cloudy, Fluorescent, Tungsten, and Shade. The selected mode is applied alongside manual shutter speed and ISO through the CameraX capture request pipeline.
