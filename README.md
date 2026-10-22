@@ -106,3 +106,7 @@ Solar Horror adds a dramatic red-orange solar glow, radial rays, dark vignette, 
 ## Film Stock filter
 
 Film Stock adds a scanned-film look with lifted blacks, warm highlights, cooler shadows, halation, vignette, deterministic fine grain, and letterbox bars. It is rendered by the same shared effect path as the other filters, so it appears in preview and is composited into saved photos and videos.
+
+## Dark night filters
+
+Cyberpunk Night and Neon Night are optimized for dark scenes: they deepen navy shadows, emphasize cyan and magenta light sources, add colored bloom/glow, and apply a controlled vignette. Cyberpunk Night also adds subtle scan lines; Neon Night keeps a cleaner neon-cinema look. Both effects are rendered in preview and composited into saved photos and videos.

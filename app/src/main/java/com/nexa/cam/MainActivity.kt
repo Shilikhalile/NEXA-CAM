@@ -149,6 +149,39 @@ private fun renderColorEffect(canvas: Canvas, filter: Int, width: Float, height:
             canvas.drawRect(0f, 0f, width, bar, bars)
             canvas.drawRect(0f, height - bar, width, height, bars)
         }
+        17 -> { // Cyberpunk Night
+            canvas.drawColor(Color.argb(138, 2, 5, 24))
+            val grade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(0f, height, width, 0f, Color.argb(100, 0, 140, 210), Color.argb(95, 200, 0, 150), Shader.TileMode.CLAMP)
+            }
+            canvas.drawRect(0f, 0f, width, height, grade)
+            val cyanGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(width * 0.22f, height * 0.38f, width * 0.30f, Color.argb(115, 0, 235, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            }
+            canvas.drawRect(0f, 0f, width, height, cyanGlow)
+            val magentaGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(width * 0.82f, height * 0.30f, width * 0.34f, Color.argb(110, 255, 0, 185), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            }
+            canvas.drawRect(0f, 0f, width, height, magentaGlow)
+            val lines = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(24, 90, 220, 255); strokeWidth = 1f }
+            var y = 0f
+            while (y < height) { canvas.drawLine(0f, y, width, y, lines); y += 8f }
+            val vignette = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = RadialGradient(width / 2f, height / 2f, width * 0.72f, Color.TRANSPARENT, Color.argb(180, 0, 0, 0), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, vignette)
+        }
+        18 -> { // Neon Night
+            canvas.drawColor(Color.argb(112, 3, 8, 16))
+            val cool = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, 0f, height, Color.argb(70, 8, 90, 155), Color.argb(95, 2, 3, 20), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, cool)
+            val neon = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = RadialGradient(width * 0.52f, height * 0.42f, width * 0.44f, intArrayOf(Color.argb(82, 0, 255, 210), Color.argb(30, 40, 35, 180), Color.TRANSPARENT), floatArrayOf(0f, 0.48f, 1f), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, neon)
+            val hot = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = RadialGradient(width * 0.76f, height * 0.20f, width * 0.24f, Color.argb(125, 255, 50, 155), Color.TRANSPARENT, Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, hot)
+            val bloom = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(38, 220, 245, 255); strokeWidth = width * 0.012f }
+            canvas.drawLine(0f, height * 0.60f, width, height * 0.60f, bloom)
+            val vignette = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = RadialGradient(width / 2f, height / 2f, width * 0.80f, Color.TRANSPARENT, Color.argb(155, 0, 0, 0), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, vignette)
+        }
         16 -> { // Film Stock
             // Lifted blacks + warm highlights + cool shadows for a scanned-film character.
             canvas.drawColor(Color.argb(34, 22, 15, 12))
@@ -510,7 +543,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showFilterPicker() {
-        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint", "Vivid", "Golden Hour", "Teal & Orange", "Matte", "Vintage", "Cyberpunk", "Cinematic", "Noir", "Solar Horror", "Film Stock")
+        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint", "Vivid", "Golden Hour", "Teal & Orange", "Matte", "Vintage", "Cyberpunk", "Cinematic", "Noir", "Solar Horror", "Film Stock", "Cyberpunk Night", "Neon Night")
         AlertDialog.Builder(this)
             .setTitle("FILTERS & EFFECTS")
             .setSingleChoiceItems(filters, currentFilter) { dialog, which ->
