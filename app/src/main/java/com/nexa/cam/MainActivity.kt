@@ -62,6 +62,69 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
+private fun renderColorEffect(canvas: Canvas, filter: Int, width: Float, height: Float) {
+    when (filter) {
+        1 -> canvas.drawColor(Color.argb(42, 255, 145, 45))
+        2 -> canvas.drawColor(Color.argb(38, 35, 125, 255))
+        3 -> {
+            canvas.drawColor(Color.argb(28, 12, 0, 0))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, width, height, Color.argb(55, 120, 20, 20), Color.TRANSPARENT, Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+        }
+        4 -> canvas.drawColor(Color.argb(48, 190, 20, 35))
+        5 -> canvas.drawColor(Color.argb(32, 220, 205, 170))
+        6 -> {
+            canvas.drawColor(Color.argb(58, 20, 20, 20))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, 0f, height, Color.TRANSPARENT, Color.argb(85, 0, 0, 0), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+        }
+        7 -> { // Vivid
+            canvas.drawColor(Color.argb(24, 255, 30, 30))
+            canvas.drawColor(Color.argb(18, 20, 80, 255))
+        }
+        8 -> { // Golden Hour
+            canvas.drawColor(Color.argb(62, 255, 145, 35))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, 0f, height, Color.argb(65, 255, 205, 90), Color.TRANSPARENT, Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+        }
+        9 -> { // Teal and Orange
+            canvas.drawColor(Color.argb(38, 0, 105, 115))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, height, width, 0f, Color.argb(70, 255, 100, 30), Color.TRANSPARENT, Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+        }
+        10 -> { // Matte
+            canvas.drawColor(Color.argb(50, 35, 25, 20))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, 0f, height, Color.argb(30, 255, 255, 255), Color.argb(80, 0, 0, 0), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+        }
+        11 -> { // Vintage
+            canvas.drawColor(Color.argb(76, 120, 70, 32))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, width, height, Color.argb(45, 255, 210, 130), Color.argb(30, 45, 20, 5), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+        }
+        12 -> { // Cyberpunk
+            canvas.drawColor(Color.argb(55, 20, 0, 95))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, width, height, Color.argb(75, 255, 0, 130), Color.argb(55, 0, 180, 255), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+        }
+        13 -> { // Cinematic
+            canvas.drawColor(Color.argb(38, 5, 20, 22))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, 0f, height, Color.argb(45, 0, 55, 65), Color.argb(70, 0, 0, 0), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+            paint.shader = null
+            paint.color = Color.BLACK
+            val bar = height * 0.075f
+            canvas.drawRect(0f, 0f, width, bar, paint)
+            canvas.drawRect(0f, height - bar, width, height, paint)
+        }
+        14 -> { // Noir
+            canvas.drawColor(Color.argb(105, 8, 8, 8))
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, width, height, Color.argb(20, 255, 255, 255), Color.argb(95, 0, 0, 0), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, paint)
+        }
+    }
+}
+
 class MainActivity : AppCompatActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var statusText: TextView
@@ -393,9 +456,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showFilterPicker() {
-        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint")
+        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint", "Vivid", "Golden Hour", "Teal & Orange", "Matte", "Vintage", "Cyberpunk", "Cinematic", "Noir")
         AlertDialog.Builder(this)
-            .setTitle("LIVE FILTER")
+            .setTitle("FILTERS & EFFECTS")
             .setSingleChoiceItems(filters, currentFilter) { dialog, which ->
                 currentFilter = which
                 filterOverlay.setFilter(which)
@@ -505,32 +568,11 @@ class MainActivity : AppCompatActivity() {
         camera?.cameraControl?.enableTorch(flashEnabled && available && videoMode)
     }
     private fun drawSavedFilter(frame: Frame): Boolean {
-        val canvas = frame.overlayCanvas
-        when (currentFilter) {
-            1 -> canvas.drawColor(Color.argb(42, 255, 145, 45))
-            2 -> canvas.drawColor(Color.argb(38, 35, 125, 255))
-            3 -> {
-                canvas.drawColor(Color.argb(28, 12, 0, 0))
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = LinearGradient(0f, 0f, frame.size.width.toFloat(), frame.size.height.toFloat(), Color.argb(55, 120, 20, 20), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-                }
-                canvas.drawRect(0f, 0f, frame.size.width.toFloat(), frame.size.height.toFloat(), paint)
-            }
-            4 -> canvas.drawColor(Color.argb(48, 190, 20, 35))
-            5 -> canvas.drawColor(Color.argb(32, 220, 205, 170))
-            6 -> {
-                canvas.drawColor(Color.argb(58, 20, 20, 20))
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = LinearGradient(0f, 0f, 0f, frame.size.height.toFloat(), Color.TRANSPARENT, Color.argb(85, 0, 0, 0), Shader.TileMode.CLAMP)
-                }
-                canvas.drawRect(0f, 0f, frame.size.width.toFloat(), frame.size.height.toFloat(), paint)
-            }
-        }
+        renderColorEffect(frame.overlayCanvas, currentFilter, frame.size.width.toFloat(), frame.size.height.toFloat())
         return true
     }
 
     private fun manualExposureEnabled() = proPhotoMode && !videoMode
-
     private fun applyManualExposure(extender: Camera2Interop.Extender<*>) {
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
@@ -648,24 +690,7 @@ class MainActivity : AppCompatActivity() {
         private var filter = 0
         fun setFilter(value: Int) { filter = value; invalidate() }
         override fun onDraw(canvas: Canvas) {
-            when (filter) {
-                1 -> canvas.drawColor(Color.argb(42, 255, 145, 45))
-                2 -> canvas.drawColor(Color.argb(38, 35, 125, 255))
-                3 -> {
-                    canvas.drawColor(Color.argb(28, 12, 0, 0))
-                    paint.shader = LinearGradient(0f, 0f, width.toFloat(), height.toFloat(), Color.argb(55, 120, 20, 20), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-                    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-                    paint.shader = null
-                }
-                4 -> canvas.drawColor(Color.argb(48, 190, 20, 35))
-                5 -> canvas.drawColor(Color.argb(32, 220, 205, 170))
-                6 -> {
-                    canvas.drawColor(Color.argb(58, 20, 20, 20))
-                    paint.shader = LinearGradient(0f, 0f, 0f, height.toFloat(), Color.TRANSPARENT, Color.argb(85, 0, 0, 0), Shader.TileMode.CLAMP)
-                    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-                    paint.shader = null
-                }
-            }
+            renderColorEffect(canvas, filter, width.toFloat(), height.toFloat())
         }
     }
 }

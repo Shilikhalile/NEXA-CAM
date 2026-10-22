@@ -94,3 +94,7 @@ Photo Face Retouch uses the CameraX `FACE_RETOUCH` extension when supported by t
 ## Expanded powerful photo modes
 
 The mode picker now includes Photo Smart Scene (`AUTO` extension), Photo HDR Boost, Photo Night Boost, Photo Portrait, Photo Face Retouch, and Photo Pro. HDR and Night expose a real extension-strength slider because CameraX uses that value to control fusion and final brightness; Portrait controls blur and Face Retouch controls cosmetic enhancement. Unsupported OEM modes fall back safely.
+
+## Filters and cinematic effects
+
+The filter picker now includes Vivid, Golden Hour, Teal & Orange, Matte, Vintage, Cyberpunk, Cinematic, and Noir in addition to the original presets. Effects are rendered through the shared overlay renderer so the selected look appears on the live preview and is composited into saved photos and videos. Cinematic adds a teal/blue shadow grade, warm highlight tint, vignette-like darkening, and letterbox bars.
