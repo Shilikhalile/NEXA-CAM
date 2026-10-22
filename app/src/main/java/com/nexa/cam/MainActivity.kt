@@ -2,6 +2,7 @@ package com.nexa.cam
 
 import android.Manifest
 import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Canvas
@@ -60,6 +61,8 @@ class MainActivity : AppCompatActivity() {
     private var activeRecording: Recording? = null
     private var camera: Camera? = null
     private var videoMode = false
+    private var proPhotoMode = false
+    private var forceLowPower = false
     private var lensFacing = CameraSelector.LENS_FACING_BACK
     private var flashEnabled = false
     private var recordingNow = false
@@ -136,8 +139,8 @@ class MainActivity : AppCompatActivity() {
         viewfinder.addView(grid, FrameLayout.LayoutParams(-1, -1))
         root.addView(viewfinder, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(8); bottomMargin = dp(8) })
 
-        modeButton = makeButton("MODE: PHOTO")
-        modeButton.setOnClickListener { if (!recordingNow) { videoMode = !videoMode; updateUI(); startCamera() } else showError("Stop recording before switching mode.") }
+        modeButton = makeButton("MODE: PHOTO AUTO")
+        modeButton.setOnClickListener { if (!recordingNow) showModePicker() else showError("Stop recording before switching mode.") }
         qualityButton = makeButton("4K AUTO")
         qualityButton.setOnClickListener {
             if (!recordingNow) { request4K = !request4K; updateUI(); if (videoMode) startCamera() }
@@ -196,13 +199,39 @@ class MainActivity : AppCompatActivity() {
         val flipButton = makeButton("FLIP").apply { setOnClickListener { if (!recordingNow) { lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK; startCamera() } } }
         actions.addView(flashButton, LinearLayout.LayoutParams(0, dp(54), 1f).apply { rightMargin = dp(6) }); actions.addView(shutterButton, LinearLayout.LayoutParams(0, dp(62), 1.25f).apply { leftMargin = dp(4); rightMargin = dp(4) }); actions.addView(flipButton, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(6) }); root.addView(actions)
         root.addView(TextView(this).apply {
-            text = if (lowPowerProfile) "AUTO PERFORMANCE  •  TAP TO FOCUS  •  ${qualityLabel()}" else "AUTO QUALITY READY  •  TAP TO FOCUS  •  ${qualityLabel()}"
+            text = if (isLowPowerActive()) "AUTO PERFORMANCE  •  TAP TO FOCUS  •  ${qualityLabel()}" else "AUTO QUALITY READY  •  TAP TO FOCUS  •  ${qualityLabel()}"
             textSize = 9f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(Color.LTGRAY); setPadding(0, dp(8), 0, dp(2))
         })
         setContentView(root); updateUI()
     }
 
     private fun makeButton(label: String) = Button(this).apply { text = label; textSize = 11f; isAllCaps = false; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(31, 31, 31)); stateListAnimator = null }
+
+    private fun showModePicker() {
+        val modes = arrayOf("Photo Auto", "Photo Pro", "Video HD + EIS", "Video 4K + EIS", "Video Low Power")
+        val selected = when {
+            !videoMode && proPhotoMode -> 1
+            !videoMode -> 0
+            forceLowPower -> 4
+            request4K -> 3
+            else -> 2
+        }
+        AlertDialog.Builder(this)
+            .setTitle("NEXA CAM MODE")
+            .setSingleChoiceItems(modes, selected) { dialog, which ->
+                videoMode = which >= 2
+                proPhotoMode = which == 1
+                forceLowPower = which == 4
+                request4K = which == 3
+                dialog.dismiss()
+                updateUI()
+                startCamera()
+            }
+            .setNegativeButton("CANCEL", null)
+            .show()
+    }
+
+    private fun isLowPowerActive() = lowPowerProfile || forceLowPower
 
     private fun startCamera() {
         val future = ProcessCameraProvider.getInstance(this)
@@ -211,11 +240,11 @@ class MainActivity : AppCompatActivity() {
             if (!provider.hasCamera(selector)) { showError("This camera is not available."); return@addListener }
             val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
             imageCapture = ImageCapture.Builder()
-                .setCaptureMode(if (lowPowerProfile) ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY else ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                .setJpegQuality(if (lowPowerProfile) 82 else 95)
+                .setCaptureMode(if (isLowPowerActive()) ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY else ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .setJpegQuality(if (isLowPowerActive()) 82 else 95)
                 .setFlashMode(if (flashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF)
                 .build()
-            val fallback = if (request4K && !lowPowerProfile) Quality.FHD else Quality.HD
+            val fallback = if (request4K && !isLowPowerActive()) Quality.FHD else Quality.HD
             val recorder = Recorder.Builder().setQualitySelector(
                 QualitySelector.from(preferredVideoQuality(), FallbackStrategy.lowerQualityOrHigherThan(fallback))
             ).build()
@@ -297,16 +326,23 @@ class MainActivity : AppCompatActivity() {
         return manager.isLowRamDevice || manager.memoryClass < 256
     }
     private fun preferredVideoQuality(): Quality = when {
-        lowPowerProfile -> Quality.SD
+        isLowPowerActive() -> Quality.SD
         request4K -> Quality.UHD
         else -> Quality.HD
     }
     private fun qualityLabel(): String = when {
-        lowPowerProfile -> "LOW POWER 480p"
+        isLowPowerActive() -> "LOW POWER 480p"
         request4K -> "4K AUTO"
         else -> "HD 720p"
     }
-    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = if (videoMode) "MODE: VIDEO  •  TAP TO SWITCH" else "MODE: PHOTO  •  TAP TO SWITCH"; qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
+    private fun modeLabel(): String = when {
+        !videoMode && proPhotoMode -> "MODE: PHOTO PRO"
+        !videoMode -> "MODE: PHOTO AUTO"
+        forceLowPower -> "MODE: VIDEO LOW POWER"
+        request4K -> "MODE: VIDEO 4K"
+        else -> "MODE: VIDEO HD"
+    }
+    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
     private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()

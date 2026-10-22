@@ -50,3 +50,7 @@ Tap the viewfinder to refocus. Hold for 550 ms to lock focus and metering at tha
 ## Electronic image stabilization
 
 Video mode now requests CameraX electronic video stabilization. When the device/camera combination rejects stabilization, NEXA CAM automatically rebinds without EIS instead of crashing and does not display `EIS ON`.
+
+## Camera modes
+
+The mode picker now provides five functional modes: Photo Auto, Photo Pro, Video HD + EIS, Video 4K + EIS, and Video Low Power. Each mode changes capture quality and camera behavior; unsupported 4K or EIS still uses the safe fallback path.
