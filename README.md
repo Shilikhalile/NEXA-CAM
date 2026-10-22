@@ -78,3 +78,7 @@ The mode picker now includes Photo Smart HDR and Photo Night. These modes use Ca
 ## Portrait photo mode
 
 Photo Portrait uses the CameraX Bokeh extension when the device exposes a supported portrait/depth implementation. Unsupported cameras fall back to Photo Auto without crashing.
+
+## Portrait blur intensity
+
+Photo Portrait now shows a `BLUR` slider from 0% to 100%. It uses CameraX `CameraExtensionsControl.setExtensionStrength()` so supported OEM Bokeh implementations adjust the actual background blur in the captured photo. On devices without extension-strength support, the standard Portrait result remains available and the app stays stable.

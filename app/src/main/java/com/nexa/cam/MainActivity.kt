@@ -76,6 +76,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var shutterValueText: TextView
     private lateinit var isoValueText: TextView
     private lateinit var whiteBalanceButton: Button
+    private lateinit var portraitControls: LinearLayout
+    private lateinit var blurValueText: TextView
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -108,6 +110,9 @@ class MainActivity : AppCompatActivity() {
     )
     private val whiteBalanceLabels = arrayOf("WB AUTO", "DAYLIGHT", "CLOUDY", "FLUORESCENT", "TUNGSTEN", "SHADE")
     private var whiteBalanceIndex = 0
+    private var blurStrength = 70
+    private var extensionControl: Any? = null
+    private var activeExtensionsManager: ExtensionsManager? = null
     private var focusLocked = false
     private var longPressTriggered = false
     private var touchDownX = 0f
@@ -272,6 +277,22 @@ class MainActivity : AppCompatActivity() {
         proControls.addView(whiteBalanceButton, LinearLayout.LayoutParams(-1, dp(36)).apply { topMargin = dp(2); bottomMargin = dp(3) })
         root.addView(proControls)
 
+        portraitControls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        val blurRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        blurValueText = TextView(this).apply { text = "BLUR 70%"; setTextColor(Color.LTGRAY); textSize = 11f }
+        blurRow.addView(blurValueText, LinearLayout.LayoutParams(dp(72), dp(32)))
+        val blurBar = SeekBar(this).apply {
+            max = 100; progress = blurStrength
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) { blurStrength = progress; blurValueText.text = "BLUR ${blurStrength}%"; if (fromUser) applyExtensionStrength() }
+                override fun onStartTrackingTouch(bar: SeekBar) = Unit
+                override fun onStopTrackingTouch(bar: SeekBar) = Unit
+            })
+        }
+        blurRow.addView(blurBar, LinearLayout.LayoutParams(0, dp(32), 1f))
+        portraitControls.addView(blurRow)
+        root.addView(portraitControls)
+
         galleryButton = makeButton("OPEN GALLERY")
         galleryButton.setOnClickListener { openGallery() }
         root.addView(galleryButton, LinearLayout.LayoutParams(-1, dp(38)).apply { topMargin = dp(3); bottomMargin = dp(5) })
@@ -319,6 +340,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isLowPowerActive() = lowPowerProfile || forceLowPower
+
+    private fun applyExtensionStrength() {
+        if (photoEnhancementMode != 3) return
+        try {
+            val activeCamera = camera ?: return
+            val info = activeExtensionsManager?.getCameraExtensionsInfo(activeCamera.cameraInfo) ?: return
+            if (info.isExtensionStrengthAvailable) {
+                extensionControl = activeExtensionsManager?.getCameraExtensionsControl(activeCamera.cameraControl)
+                (extensionControl as? androidx.camera.extensions.CameraExtensionsControl)?.setExtensionStrength(blurStrength)
+            }
+        } catch (_: Exception) {
+            // Unsupported OEM extension: the standard Portrait fallback remains active.
+        }
+    }
 
     private fun showWhiteBalancePicker() {
         AlertDialog.Builder(this)
@@ -386,6 +421,8 @@ class MainActivity : AppCompatActivity() {
                 camera = provider.bindToLifecycle(this, selector, groupBuilder.build())
                 filterOverlay.visibility = View.GONE
                 eisEnabled = videoMode
+                extensionControl = null
+                applyExtensionStrength()
                 if (camera?.cameraInfo?.hasFlashUnit() != true) flashEnabled = false
                 flashButton.isEnabled = camera?.cameraInfo?.hasFlashUnit() == true
                 applyFlash(); configureExposure(); updateUI()
@@ -413,6 +450,7 @@ class MainActivity : AppCompatActivity() {
         if (videoMode || photoEnhancementMode == 0) return baseSelector
         return try {
             val manager = ExtensionsManager.getInstanceAsync(this, provider).get()
+            activeExtensionsManager = manager
             val extensionMode = when (photoEnhancementMode) {
                 2 -> ExtensionMode.NIGHT
                 3 -> ExtensionMode.BOKEH
@@ -558,7 +596,7 @@ class MainActivity : AppCompatActivity() {
         request4K -> "MODE: VIDEO 4K"
         else -> "MODE: VIDEO HD"
     }
-    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (::proControls.isInitialized) proControls.visibility = if (manualExposureEnabled()) View.VISIBLE else View.GONE; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
+    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (::proControls.isInitialized) proControls.visibility = if (manualExposureEnabled()) View.VISIBLE else View.GONE; if (::portraitControls.isInitialized) portraitControls.visibility = if (!videoMode && photoEnhancementMode == 3) View.VISIBLE else View.GONE; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
     private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
