@@ -98,3 +98,7 @@ The mode picker now includes Photo Smart Scene (`AUTO` extension), Photo HDR Boo
 ## Filters and cinematic effects
 
 The filter picker now includes Vivid, Golden Hour, Teal & Orange, Matte, Vintage, Cyberpunk, Cinematic, and Noir in addition to the original presets. Effects are rendered through the shared overlay renderer so the selected look appears on the live preview and is composited into saved photos and videos. Cinematic adds a teal/blue shadow grade, warm highlight tint, vignette-like darkening, and letterbox bars.
+
+## Solar Horror effect
+
+Solar Horror adds a dramatic red-orange solar glow, radial rays, dark vignette, and cinematic bars for a frightening sunlit look. It is a creative overlay only, not a solar-viewing safety filter; users should never point the phone at the sun for prolonged periods or look directly at the sun.

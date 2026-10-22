@@ -11,6 +11,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.LinearGradient
 import android.graphics.Shader
 import android.os.Build
@@ -121,6 +122,32 @@ private fun renderColorEffect(canvas: Canvas, filter: Int, width: Float, height:
             canvas.drawColor(Color.argb(105, 8, 8, 8))
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, width, height, Color.argb(20, 255, 255, 255), Color.argb(95, 0, 0, 0), Shader.TileMode.CLAMP) }
             canvas.drawRect(0f, 0f, width, height, paint)
+        }
+        15 -> { // Solar Horror
+            canvas.drawColor(Color.argb(92, 12, 2, 4))
+            val sunX = width * 0.72f
+            val sunY = height * 0.18f
+            val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(sunX, sunY, width * 0.42f, intArrayOf(Color.argb(145, 255, 55, 5), Color.argb(65, 150, 0, 0), Color.TRANSPARENT), floatArrayOf(0f, 0.22f, 1f), Shader.TileMode.CLAMP)
+            }
+            canvas.drawRect(0f, 0f, width, height, glow)
+            val sun = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(sunX, sunY, width * 0.10f, intArrayOf(Color.argb(255, 255, 238, 160), Color.argb(255, 255, 75, 0), Color.argb(0, 65, 0, 0)), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+            }
+            canvas.drawCircle(sunX, sunY, width * 0.16f, sun)
+            val rays = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(80, 255, 35, 5); strokeWidth = width * 0.006f }
+            for (i in 0 until 12) {
+                val a = Math.toRadians((i * 30).toDouble())
+                val r1 = width * 0.18f
+                val r2 = width * 0.31f
+                canvas.drawLine(sunX + kotlin.math.cos(a).toFloat() * r1, sunY + kotlin.math.sin(a).toFloat() * r1, sunX + kotlin.math.cos(a).toFloat() * r2, sunY + kotlin.math.sin(a).toFloat() * r2, rays)
+            }
+            val vignette = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = RadialGradient(width / 2f, height / 2f, width * 0.78f, Color.TRANSPARENT, Color.argb(160, 0, 0, 0), Shader.TileMode.CLAMP) }
+            canvas.drawRect(0f, 0f, width, height, vignette)
+            val bar = height * 0.045f
+            val bars = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+            canvas.drawRect(0f, 0f, width, bar, bars)
+            canvas.drawRect(0f, height - bar, width, height, bars)
         }
     }
 }
@@ -456,7 +483,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showFilterPicker() {
-        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint", "Vivid", "Golden Hour", "Teal & Orange", "Matte", "Vintage", "Cyberpunk", "Cinematic", "Noir")
+        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint", "Vivid", "Golden Hour", "Teal & Orange", "Matte", "Vintage", "Cyberpunk", "Cinematic", "Noir", "Solar Horror")
         AlertDialog.Builder(this)
             .setTitle("FILTERS & EFFECTS")
             .setSingleChoiceItems(filters, currentFilter) { dialog, which ->
