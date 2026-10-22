@@ -149,6 +149,33 @@ private fun renderColorEffect(canvas: Canvas, filter: Int, width: Float, height:
             canvas.drawRect(0f, 0f, width, bar, bars)
             canvas.drawRect(0f, height - bar, width, height, bars)
         }
+        16 -> { // Film Stock
+            // Lifted blacks + warm highlights + cool shadows for a scanned-film character.
+            canvas.drawColor(Color.argb(34, 22, 15, 12))
+            val grade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(0f, 0f, 0f, height, Color.argb(58, 255, 195, 112), Color.argb(52, 26, 43, 60), Shader.TileMode.CLAMP)
+            }
+            canvas.drawRect(0f, 0f, width, height, grade)
+            val halation = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(width * 0.5f, height * 0.35f, width * 0.62f, Color.argb(28, 255, 120, 45), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            }
+            canvas.drawRect(0f, 0f, width, height, halation)
+            val vignette = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(width / 2f, height / 2f, width * 0.78f, Color.TRANSPARENT, Color.argb(105, 0, 0, 0), Shader.TileMode.CLAMP)
+            }
+            canvas.drawRect(0f, 0f, width, height, vignette)
+            val grain = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(30, 245, 230, 205) }
+            for (i in 0 until 180) {
+                val gx = ((i * 83 + 41) % 997) / 997f * width
+                val gy = ((i * 197 + 17) % 991) / 991f * height
+                val size = if (i % 5 == 0) 1.6f else 0.8f
+                canvas.drawCircle(gx, gy, size, grain)
+            }
+            val bar = height * 0.05f
+            val bars = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(235, 8, 7, 6) }
+            canvas.drawRect(0f, 0f, width, bar, bars)
+            canvas.drawRect(0f, height - bar, width, height, bars)
+        }
     }
 }
 
@@ -483,7 +510,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showFilterPicker() {
-        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint", "Vivid", "Golden Hour", "Teal & Orange", "Matte", "Vintage", "Cyberpunk", "Cinematic", "Noir", "Solar Horror")
+        val filters = arrayOf("Original", "Warm", "Cool", "Cinema", "Nexa Red", "Fade", "Noir Tint", "Vivid", "Golden Hour", "Teal & Orange", "Matte", "Vintage", "Cyberpunk", "Cinematic", "Noir", "Solar Horror", "Film Stock")
         AlertDialog.Builder(this)
             .setTitle("FILTERS & EFFECTS")
             .setSingleChoiceItems(filters, currentFilter) { dialog, which ->

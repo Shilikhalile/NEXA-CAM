@@ -102,3 +102,7 @@ The filter picker now includes Vivid, Golden Hour, Teal & Orange, Matte, Vintage
 ## Solar Horror effect
 
 Solar Horror adds a dramatic red-orange solar glow, radial rays, dark vignette, and cinematic bars for a frightening sunlit look. It is a creative overlay only, not a solar-viewing safety filter; users should never point the phone at the sun for prolonged periods or look directly at the sun.
+
+## Film Stock filter
+
+Film Stock adds a scanned-film look with lifted blacks, warm highlights, cooler shadows, halation, vignette, deterministic fine grain, and letterbox bars. It is rendered by the same shared effect path as the other filters, so it appears in preview and is composited into saved photos and videos.
