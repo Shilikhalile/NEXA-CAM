@@ -38,4 +38,5 @@ dependencies {
     implementation("androidx.camera:camera-view:$camerax")
     implementation("androidx.camera:camera-video:$camerax")
     implementation("androidx.camera:camera-effects:$camerax")
+    implementation("androidx.camera:camera-extensions:$camerax")
 }

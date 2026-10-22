@@ -38,6 +38,8 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.extensions.ExtensionsManager
+import androidx.camera.extensions.ExtensionMode
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -80,6 +82,7 @@ class MainActivity : AppCompatActivity() {
     private var camera: Camera? = null
     private var videoMode = false
     private var proPhotoMode = false
+    private var photoEnhancementMode = 0 // 0 auto, 1 HDR, 2 Night
     private var forceLowPower = false
     private var lensFacing = CameraSelector.LENS_FACING_BACK
     private var flashEnabled = false
@@ -288,21 +291,24 @@ class MainActivity : AppCompatActivity() {
     private fun makeButton(label: String) = Button(this).apply { text = label; textSize = 11f; isAllCaps = false; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(31, 31, 31)); stateListAnimator = null }
 
     private fun showModePicker() {
-        val modes = arrayOf("Photo Auto", "Photo Pro", "Video HD + EIS", "Video 4K + EIS", "Video Low Power")
+        val modes = arrayOf("Photo Auto", "Photo Smart HDR", "Photo Night", "Photo Pro", "Video HD + EIS", "Video 4K + EIS", "Video Low Power")
         val selected = when {
-            !videoMode && proPhotoMode -> 1
+            !videoMode && proPhotoMode -> 3
+            !videoMode && photoEnhancementMode == 1 -> 1
+            !videoMode && photoEnhancementMode == 2 -> 2
             !videoMode -> 0
-            forceLowPower -> 4
-            request4K -> 3
-            else -> 2
+            forceLowPower -> 6
+            request4K -> 5
+            else -> 4
         }
         AlertDialog.Builder(this)
             .setTitle("NEXA CAM MODE")
             .setSingleChoiceItems(modes, selected) { dialog, which ->
-                videoMode = which >= 2
-                proPhotoMode = which == 1
-                forceLowPower = which == 4
-                request4K = which == 3
+                videoMode = which >= 4
+                proPhotoMode = which == 3
+                photoEnhancementMode = when (which) { 1 -> 1; 2 -> 2; else -> 0 }
+                forceLowPower = which == 6
+                request4K = which == 5
                 dialog.dismiss()
                 updateUI()
                 startCamera()
@@ -343,7 +349,9 @@ class MainActivity : AppCompatActivity() {
     private fun startCamera() {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
-            val provider = future.get(); val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+            val provider = future.get()
+            val baseSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+            val selector = selectPhotoEnhancement(provider, baseSelector)
             if (!provider.hasCamera(selector)) { showError("This camera is not available."); return@addListener }
             val previewBuilder = Preview.Builder()
             if (manualExposureEnabled()) applyManualExposure(Camera2Interop.Extender(previewBuilder))
@@ -398,6 +406,23 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun selectPhotoEnhancement(provider: ProcessCameraProvider, baseSelector: CameraSelector): CameraSelector {
+        if (videoMode || photoEnhancementMode == 0) return baseSelector
+        return try {
+            val manager = ExtensionsManager.getInstanceAsync(this, provider).get()
+            val extensionMode = if (photoEnhancementMode == 2) ExtensionMode.NIGHT else ExtensionMode.HDR
+            if (manager.isExtensionAvailable(baseSelector, extensionMode)) {
+                manager.getExtensionEnabledCameraSelector(baseSelector, extensionMode)
+            } else {
+                showError("${if (photoEnhancementMode == 2) "Night" else "HDR"} mode is not supported; using Auto.")
+                baseSelector
+            }
+        } catch (_: Exception) {
+            showError("Smart photo mode unavailable; using Auto.")
+            baseSelector
+        }
     }
 
     private fun applyFlash() {
@@ -519,6 +544,8 @@ class MainActivity : AppCompatActivity() {
     }
     private fun modeLabel(): String = when {
         !videoMode && proPhotoMode -> "MODE: PHOTO PRO"
+        !videoMode && photoEnhancementMode == 1 -> "MODE: PHOTO HDR"
+        !videoMode && photoEnhancementMode == 2 -> "MODE: PHOTO NIGHT"
         !videoMode -> "MODE: PHOTO AUTO"
         forceLowPower -> "MODE: VIDEO LOW POWER"
         request4K -> "MODE: VIDEO 4K"

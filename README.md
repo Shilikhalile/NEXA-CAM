@@ -70,3 +70,7 @@ Photo Pro now exposes manual shutter speed and ISO controls. Shutter choices ran
 ## Manual white balance
 
 Photo Pro now includes Camera2 manual white-balance presets: Auto, Daylight, Cloudy, Fluorescent, Tungsten, and Shade. The selected mode is applied alongside manual shutter speed and ISO through the CameraX capture request pipeline.
+
+## Smart computational photo modes
+
+The mode picker now includes Photo Smart HDR and Photo Night. These modes use CameraX Extensions to request the phone manufacturer's HDR or Night processing when supported by the camera. Unsupported devices fall back to Photo Auto without crashing. Photo Pro remains available for manual shutter, ISO, and white balance control.
