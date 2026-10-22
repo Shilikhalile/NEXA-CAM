@@ -90,3 +90,7 @@ Photo Pro now includes a focus-distance slider from infinity to the lens minimum
 ## Face Retouch mode
 
 Photo Face Retouch uses the CameraX `FACE_RETOUCH` extension when supported by the OEM camera. Its 0-100% strength control adjusts the amount of cosmetic enhancement and skin smoothing. Unsupported devices fall back safely.
+
+## Expanded powerful photo modes
+
+The mode picker now includes Photo Smart Scene (`AUTO` extension), Photo HDR Boost, Photo Night Boost, Photo Portrait, Photo Face Retouch, and Photo Pro. HDR and Night expose a real extension-strength slider because CameraX uses that value to control fusion and final brightness; Portrait controls blur and Face Retouch controls cosmetic enhancement. Unsupported OEM modes fall back safely.

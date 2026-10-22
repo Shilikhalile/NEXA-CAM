@@ -306,7 +306,7 @@ class MainActivity : AppCompatActivity() {
         val blurBar = SeekBar(this).apply {
             max = 100; progress = blurStrength
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) { blurStrength = progress; val label = if (photoEnhancementMode == 4) "RETOUCH" else "BLUR"; blurValueText.text = "$label ${blurStrength}%"; if (fromUser) applyExtensionStrength() }
+                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) { blurStrength = progress; val label = when (photoEnhancementMode) { 1 -> "HDR"; 2 -> "NIGHT"; 4 -> "RETOUCH"; else -> "BLUR" }; blurValueText.text = "$label ${blurStrength}%"; if (fromUser) applyExtensionStrength() }
                 override fun onStartTrackingTouch(bar: SeekBar) = Unit
                 override fun onStopTrackingTouch(bar: SeekBar) = Unit
             })
@@ -334,26 +334,27 @@ class MainActivity : AppCompatActivity() {
     private fun makeButton(label: String) = Button(this).apply { text = label; textSize = 11f; isAllCaps = false; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(31, 31, 31)); stateListAnimator = null }
 
     private fun showModePicker() {
-        val modes = arrayOf("Photo Auto", "Photo Smart HDR", "Photo Night", "Photo Portrait", "Photo Face Retouch", "Photo Pro", "Video HD + EIS", "Video 4K + EIS", "Video Low Power")
+        val modes = arrayOf("Photo Auto", "Photo Smart Scene", "Photo HDR Boost", "Photo Night Boost", "Photo Portrait", "Photo Face Retouch", "Photo Pro", "Video HD + EIS", "Video 4K + EIS", "Video Low Power")
         val selected = when {
-            !videoMode && proPhotoMode -> 5
-            !videoMode && photoEnhancementMode == 1 -> 1
-            !videoMode && photoEnhancementMode == 2 -> 2
-            !videoMode && photoEnhancementMode == 3 -> 3
-            !videoMode && photoEnhancementMode == 4 -> 4
+            !videoMode && proPhotoMode -> 6
+            !videoMode && photoEnhancementMode == 5 -> 1
+            !videoMode && photoEnhancementMode == 1 -> 2
+            !videoMode && photoEnhancementMode == 2 -> 3
+            !videoMode && photoEnhancementMode == 3 -> 4
+            !videoMode && photoEnhancementMode == 4 -> 5
             !videoMode -> 0
-            forceLowPower -> 8
-            request4K -> 7
-            else -> 6
+            forceLowPower -> 9
+            request4K -> 8
+            else -> 7
         }
         AlertDialog.Builder(this)
             .setTitle("NEXA CAM MODE")
             .setSingleChoiceItems(modes, selected) { dialog, which ->
-                videoMode = which >= 6
-                proPhotoMode = which == 5
-                photoEnhancementMode = when (which) { 1 -> 1; 2 -> 2; 3 -> 3; 4 -> 4; else -> 0 }
-                forceLowPower = which == 8
-                request4K = which == 7
+                videoMode = which >= 7
+                proPhotoMode = which == 6
+                photoEnhancementMode = when (which) { 1 -> 5; 2 -> 1; 3 -> 2; 4 -> 3; 5 -> 4; else -> 0 }
+                forceLowPower = which == 9
+                request4K = which == 8
                 dialog.dismiss()
                 updateUI()
                 startCamera()
@@ -365,7 +366,7 @@ class MainActivity : AppCompatActivity() {
     private fun isLowPowerActive() = lowPowerProfile || forceLowPower
 
     private fun applyExtensionStrength() {
-        if (photoEnhancementMode != 3 && photoEnhancementMode != 4) return
+        if (photoEnhancementMode !in 1..4) return
         try {
             val activeCamera = camera ?: return
             val info = activeExtensionsManager?.getCameraExtensionsInfo(activeCamera.cameraInfo) ?: return
@@ -481,12 +482,13 @@ class MainActivity : AppCompatActivity() {
                 2 -> ExtensionMode.NIGHT
                 3 -> ExtensionMode.BOKEH
                 4 -> ExtensionMode.FACE_RETOUCH
+                5 -> ExtensionMode.AUTO
                 else -> ExtensionMode.HDR
             }
             if (manager.isExtensionAvailable(baseSelector, extensionMode)) {
                 manager.getExtensionEnabledCameraSelector(baseSelector, extensionMode)
             } else {
-                val name = when (photoEnhancementMode) { 2 -> "Night"; 3 -> "Portrait"; 4 -> "Face Retouch"; else -> "HDR" }
+                val name = when (photoEnhancementMode) { 1 -> "HDR"; 2 -> "Night"; 3 -> "Portrait"; 4 -> "Face Retouch"; 5 -> "Smart Scene"; else -> "HDR" }
                 showError("$name mode is not supported; using Auto.")
                 baseSelector
             }
@@ -619,8 +621,9 @@ class MainActivity : AppCompatActivity() {
     }
     private fun modeLabel(): String = when {
         !videoMode && proPhotoMode -> "MODE: PHOTO PRO"
-        !videoMode && photoEnhancementMode == 1 -> "MODE: PHOTO HDR"
-        !videoMode && photoEnhancementMode == 2 -> "MODE: PHOTO NIGHT"
+        !videoMode && photoEnhancementMode == 5 -> "MODE: SMART SCENE"
+        !videoMode && photoEnhancementMode == 1 -> "MODE: PHOTO HDR BOOST"
+        !videoMode && photoEnhancementMode == 2 -> "MODE: PHOTO NIGHT BOOST"
         !videoMode && photoEnhancementMode == 3 -> "MODE: PHOTO PORTRAIT"
         !videoMode && photoEnhancementMode == 4 -> "MODE: FACE RETOUCH"
         !videoMode -> "MODE: PHOTO AUTO"
@@ -628,7 +631,7 @@ class MainActivity : AppCompatActivity() {
         request4K -> "MODE: VIDEO 4K"
         else -> "MODE: VIDEO HD"
     }
-    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (::proControls.isInitialized) proControls.visibility = if (manualExposureEnabled()) View.VISIBLE else View.GONE; if (::portraitControls.isInitialized) portraitControls.visibility = if (!videoMode && (photoEnhancementMode == 3 || photoEnhancementMode == 4)) View.VISIBLE else View.GONE; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
+    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (::proControls.isInitialized) proControls.visibility = if (manualExposureEnabled()) View.VISIBLE else View.GONE; if (::portraitControls.isInitialized) portraitControls.visibility = if (!videoMode && photoEnhancementMode in 1..4) View.VISIBLE else View.GONE; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
     private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
