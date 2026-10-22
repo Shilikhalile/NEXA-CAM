@@ -7,6 +7,7 @@ import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CameraCharacteristics
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -33,6 +34,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraEffect
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -78,6 +80,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var whiteBalanceButton: Button
     private lateinit var portraitControls: LinearLayout
     private lateinit var blurValueText: TextView
+    private lateinit var focusValueText: TextView
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -111,6 +114,8 @@ class MainActivity : AppCompatActivity() {
     private val whiteBalanceLabels = arrayOf("WB AUTO", "DAYLIGHT", "CLOUDY", "FLUORESCENT", "TUNGSTEN", "SHADE")
     private var whiteBalanceIndex = 0
     private var blurStrength = 70
+    private var focusIndex = 0
+    private var minimumFocusDistance = 0f
     private var extensionControl: Any? = null
     private var activeExtensionsManager: ExtensionsManager? = null
     private var focusLocked = false
@@ -275,6 +280,23 @@ class MainActivity : AppCompatActivity() {
         whiteBalanceButton = makeButton("WB AUTO")
         whiteBalanceButton.setOnClickListener { showWhiteBalancePicker() }
         proControls.addView(whiteBalanceButton, LinearLayout.LayoutParams(-1, dp(36)).apply { topMargin = dp(2); bottomMargin = dp(3) })
+        val focusRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        focusValueText = TextView(this).apply { text = "FOCUS AUTO"; setTextColor(Color.LTGRAY); textSize = 11f }
+        focusRow.addView(focusValueText, LinearLayout.LayoutParams(dp(78), dp(32)))
+        val focusBar = SeekBar(this).apply {
+            max = 100; progress = focusIndex
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                    focusIndex = progress
+                    focusValueText.text = if (progress == 0) "FOCUS INF" else "FOCUS ${progress}%"
+                }
+                override fun onStartTrackingTouch(bar: SeekBar) = Unit
+                override fun onStopTrackingTouch(bar: SeekBar) { if (manualExposureEnabled() && !recordingNow) startCamera() }
+            })
+        }
+        focusRow.addView(focusBar, LinearLayout.LayoutParams(0, dp(32), 1f))
+        focusRow.addView(TextView(this).apply { text = "FOCUS"; textSize = 9f; setTextColor(Color.GRAY) }, LinearLayout.LayoutParams(dp(68), dp(32)))
+        proControls.addView(focusRow)
         root.addView(proControls)
 
         portraitControls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
@@ -387,6 +409,9 @@ class MainActivity : AppCompatActivity() {
         future.addListener({
             val provider = future.get()
             val baseSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+            minimumFocusDistance = if (manualExposureEnabled()) {
+                try { Camera2CameraInfo.from(provider.getCameraInfo(baseSelector)).getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f } catch (_: Exception) { 0f }
+            } else 0f
             val selector = selectPhotoEnhancement(provider, baseSelector)
             if (!provider.hasCamera(selector)) { showError("This camera is not available."); return@addListener }
             val previewBuilder = Preview.Builder()
@@ -508,6 +533,10 @@ class MainActivity : AppCompatActivity() {
         extender.setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, shutterSpeedsNs[shutterIndex])
         extender.setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, isoValues[isoIndex])
         extender.setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, whiteBalanceModes[whiteBalanceIndex])
+        if (minimumFocusDistance > 0f) {
+            extender.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+            extender.setCaptureRequestOption(CaptureRequest.LENS_FOCUS_DISTANCE, minimumFocusDistance * focusIndex / 100f)
+        }
     }
 
     private fun configureExposure() {

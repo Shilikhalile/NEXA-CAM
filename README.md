@@ -82,3 +82,7 @@ Photo Portrait uses the CameraX Bokeh extension when the device exposes a suppor
 ## Portrait blur intensity
 
 Photo Portrait now shows a `BLUR` slider from 0% to 100%. It uses CameraX `CameraExtensionsControl.setExtensionStrength()` so supported OEM Bokeh implementations adjust the actual background blur in the captured photo. On devices without extension-strength support, the standard Portrait result remains available and the app stays stable.
+
+## Manual focus
+
+Photo Pro now includes a focus-distance slider from infinity to the lens minimum focus distance. Camera2Interop applies `CONTROL_AF_MODE_OFF` and `LENS_FOCUS_DISTANCE` when the selected camera reports manual-focus support; fixed-focus cameras keep normal autofocus behavior.
