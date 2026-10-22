@@ -29,6 +29,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraEffect
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -43,6 +45,10 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
+import androidx.camera.effects.Frame
+import androidx.camera.effects.OverlayEffect
+import androidx.arch.core.util.Function
+import androidx.core.util.Consumer
 import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -77,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private var request4K = true
     private var eisEnabled = false
     private var currentFilter = 0
+    private var savedFilterEffect: OverlayEffect? = null
     private var focusLocked = false
     private var longPressTriggered = false
     private var touchDownX = 0f
@@ -284,24 +291,38 @@ class MainActivity : AppCompatActivity() {
                 .build()
             try {
                 provider.unbindAll()
-                camera = if (videoMode) provider.bindToLifecycle(this, selector, preview, videoCapture) else provider.bindToLifecycle(this, selector, preview, imageCapture)
+                val effectTargets = CameraEffect.PREVIEW or if (videoMode) CameraEffect.VIDEO_CAPTURE else CameraEffect.IMAGE_CAPTURE
+                savedFilterEffect = OverlayEffect(
+                    effectTargets,
+                    0,
+                    Handler(Looper.getMainLooper()),
+                    Consumer { error -> showError("Saved filter disabled: ${error.localizedMessage}") }
+                ).also { effect ->
+                    effect.setOnDrawListener(Function<Frame, Boolean> { frame -> drawSavedFilter(frame) })
+                }
+                val groupBuilder = UseCaseGroup.Builder().addUseCase(preview).addEffect(savedFilterEffect!!)
+                if (videoMode) groupBuilder.addUseCase(videoCapture!!) else groupBuilder.addUseCase(imageCapture!!)
+                camera = provider.bindToLifecycle(this, selector, groupBuilder.build())
+                filterOverlay.visibility = View.GONE
                 eisEnabled = videoMode
                 if (camera?.cameraInfo?.hasFlashUnit() != true) flashEnabled = false
                 flashButton.isEnabled = camera?.cameraInfo?.hasFlashUnit() == true
                 applyFlash(); configureExposure(); updateUI()
             } catch (e: Exception) {
-                if (videoMode) {
-                    try {
-                        provider.unbindAll()
+                filterOverlay.visibility = View.VISIBLE
+                try {
+                    provider.unbindAll()
+                    if (videoMode) {
                         videoCapture = VideoCapture.withOutput(recorder)
                         camera = provider.bindToLifecycle(this, selector, preview, videoCapture)
-                        eisEnabled = false
-                        applyFlash(); configureExposure(); updateUI()
-                    } catch (fallbackError: Exception) {
-                        showError("Camera error: ${fallbackError.localizedMessage}")
+                    } else {
+                        camera = provider.bindToLifecycle(this, selector, preview, imageCapture)
                     }
-                } else {
-                    showError("Camera error: ${e.localizedMessage}")
+                    eisEnabled = videoMode
+                    applyFlash(); configureExposure(); updateUI()
+                    showError("Saved filter unavailable on this camera; original media is being saved.")
+                } catch (fallbackError: Exception) {
+                    showError("Camera error: ${fallbackError.localizedMessage}")
                 }
             }
         }, ContextCompat.getMainExecutor(this))
@@ -313,6 +334,31 @@ class MainActivity : AppCompatActivity() {
         imageCapture?.flashMode = if (flashEnabled && available) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
         camera?.cameraControl?.enableTorch(flashEnabled && available && videoMode)
     }
+    private fun drawSavedFilter(frame: Frame): Boolean {
+        val canvas = frame.overlayCanvas
+        when (currentFilter) {
+            1 -> canvas.drawColor(Color.argb(42, 255, 145, 45))
+            2 -> canvas.drawColor(Color.argb(38, 35, 125, 255))
+            3 -> {
+                canvas.drawColor(Color.argb(28, 12, 0, 0))
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = LinearGradient(0f, 0f, frame.size.width.toFloat(), frame.size.height.toFloat(), Color.argb(55, 120, 20, 20), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                }
+                canvas.drawRect(0f, 0f, frame.size.width.toFloat(), frame.size.height.toFloat(), paint)
+            }
+            4 -> canvas.drawColor(Color.argb(48, 190, 20, 35))
+            5 -> canvas.drawColor(Color.argb(32, 220, 205, 170))
+            6 -> {
+                canvas.drawColor(Color.argb(58, 20, 20, 20))
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = LinearGradient(0f, 0f, 0f, frame.size.height.toFloat(), Color.TRANSPARENT, Color.argb(85, 0, 0, 0), Shader.TileMode.CLAMP)
+                }
+                canvas.drawRect(0f, 0f, frame.size.width.toFloat(), frame.size.height.toFloat(), paint)
+            }
+        }
+        return true
+    }
+
     private fun configureExposure() {
         val state = camera?.cameraInfo?.exposureState ?: return
         exposureBar.isEnabled = state.isExposureCompensationSupported
