@@ -6,6 +6,7 @@ import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.camera2.CaptureRequest
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -31,6 +32,7 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraEffect
 import androidx.camera.core.UseCaseGroup
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -68,6 +70,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var filterButton: Button
     private lateinit var filterOverlay: FilterOverlay
     private lateinit var galleryButton: Button
+    private lateinit var proControls: LinearLayout
+    private lateinit var shutterValueText: TextView
+    private lateinit var isoValueText: TextView
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
@@ -84,6 +89,11 @@ class MainActivity : AppCompatActivity() {
     private var eisEnabled = false
     private var currentFilter = 0
     private var savedFilterEffect: OverlayEffect? = null
+    private val shutterSpeedsNs = longArrayOf(33333333L, 16666666L, 8333333L, 4166666L, 2000000L, 1000000L)
+    private val shutterLabels = arrayOf("1/30", "1/60", "1/120", "1/240", "1/500", "1/1000")
+    private val isoValues = intArrayOf(100, 200, 400, 800, 1600, 3200)
+    private var shutterIndex = 1
+    private var isoIndex = 1
     private var focusLocked = false
     private var longPressTriggered = false
     private var touchDownX = 0f
@@ -213,6 +223,38 @@ class MainActivity : AppCompatActivity() {
         exposureRow.addView(TextView(this).apply { text = "EXPOSURE"; textSize = 9f; setTextColor(Color.GRAY) }, LinearLayout.LayoutParams(dp(68), dp(32)))
         root.addView(exposureRow)
 
+        proControls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        val shutterRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        shutterValueText = TextView(this).apply { text = "1/60"; setTextColor(Color.LTGRAY); textSize = 11f }
+        shutterRow.addView(shutterValueText, LinearLayout.LayoutParams(dp(58), dp(32)))
+        val shutterBar = SeekBar(this).apply {
+            max = shutterSpeedsNs.lastIndex; progress = shutterIndex
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) { shutterIndex = progress.coerceIn(0, shutterSpeedsNs.lastIndex); shutterValueText.text = shutterLabels[shutterIndex] }
+                override fun onStartTrackingTouch(bar: SeekBar) = Unit
+                override fun onStopTrackingTouch(bar: SeekBar) { if (manualExposureEnabled() && !recordingNow) startCamera() }
+            })
+        }
+        shutterRow.addView(shutterBar, LinearLayout.LayoutParams(0, dp(32), 1f))
+        shutterRow.addView(TextView(this).apply { text = "SHUTTER"; textSize = 9f; setTextColor(Color.GRAY) }, LinearLayout.LayoutParams(dp(68), dp(32)))
+        proControls.addView(shutterRow)
+
+        val isoRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        isoValueText = TextView(this).apply { text = "ISO 200"; setTextColor(Color.LTGRAY); textSize = 11f }
+        isoRow.addView(isoValueText, LinearLayout.LayoutParams(dp(58), dp(32)))
+        val isoBar = SeekBar(this).apply {
+            max = isoValues.lastIndex; progress = isoIndex
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) { isoIndex = progress.coerceIn(0, isoValues.lastIndex); isoValueText.text = "ISO ${isoValues[isoIndex]}" }
+                override fun onStartTrackingTouch(bar: SeekBar) = Unit
+                override fun onStopTrackingTouch(bar: SeekBar) { if (manualExposureEnabled() && !recordingNow) startCamera() }
+            })
+        }
+        isoRow.addView(isoBar, LinearLayout.LayoutParams(0, dp(32), 1f))
+        isoRow.addView(TextView(this).apply { text = "ISO"; textSize = 9f; setTextColor(Color.GRAY) }, LinearLayout.LayoutParams(dp(68), dp(32)))
+        proControls.addView(isoRow)
+        root.addView(proControls)
+
         galleryButton = makeButton("OPEN GALLERY")
         galleryButton.setOnClickListener { openGallery() }
         root.addView(galleryButton, LinearLayout.LayoutParams(-1, dp(38)).apply { topMargin = dp(3); bottomMargin = dp(5) })
@@ -276,12 +318,15 @@ class MainActivity : AppCompatActivity() {
         future.addListener({
             val provider = future.get(); val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             if (!provider.hasCamera(selector)) { showError("This camera is not available."); return@addListener }
-            val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
-            imageCapture = ImageCapture.Builder()
+            val previewBuilder = Preview.Builder()
+            if (manualExposureEnabled()) applyManualExposure(Camera2Interop.Extender(previewBuilder))
+            val preview = previewBuilder.build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+            val imageBuilder = ImageCapture.Builder()
                 .setCaptureMode(if (isLowPowerActive()) ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY else ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                 .setJpegQuality(if (isLowPowerActive()) 82 else 95)
                 .setFlashMode(if (flashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF)
-                .build()
+            if (manualExposureEnabled()) applyManualExposure(Camera2Interop.Extender(imageBuilder))
+            imageCapture = imageBuilder.build()
             val fallback = if (request4K && !isLowPowerActive()) Quality.FHD else Quality.HD
             val recorder = Recorder.Builder().setQualitySelector(
                 QualitySelector.from(preferredVideoQuality(), FallbackStrategy.lowerQualityOrHigherThan(fallback))
@@ -359,7 +404,21 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
+    private fun manualExposureEnabled() = proPhotoMode && !videoMode
+
+    private fun applyManualExposure(extender: Camera2Interop.Extender<*>) {
+        extender.setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+        extender.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+        extender.setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, shutterSpeedsNs[shutterIndex])
+        extender.setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, isoValues[isoIndex])
+    }
+
     private fun configureExposure() {
+        if (manualExposureEnabled()) {
+            exposureBar.isEnabled = false
+            exposureText.text = "MANUAL"
+            return
+        }
         val state = camera?.cameraInfo?.exposureState ?: return
         exposureBar.isEnabled = state.isExposureCompensationSupported
         exposureText.text = if (state.isExposureCompensationSupported) "EV 0.0" else "EV N/A"
@@ -437,7 +496,7 @@ class MainActivity : AppCompatActivity() {
         request4K -> "MODE: VIDEO 4K"
         else -> "MODE: VIDEO HD"
     }
-    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
+    private fun updateUI() { if (!::modeButton.isInitialized) return; modeButton.text = modeLabel(); qualityButton.text = if (request4K) "4K AUTO" else "HD AUTO"; flashButton.text = if (flashEnabled) "FLASH / TORCH ON" else "FLASH OFF"; shutterButton.text = if (videoMode) if (recordingNow) "■ STOP" else "● REC" else "●"; if (::proControls.isInitialized) proControls.visibility = if (manualExposureEnabled()) View.VISIBLE else View.GONE; if (!recordingNow && !focusLocked) statusText.text = if (videoMode && eisEnabled) "● READY  •  EIS ON" else "● READY" }
     private fun timestamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
     private fun showError(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
